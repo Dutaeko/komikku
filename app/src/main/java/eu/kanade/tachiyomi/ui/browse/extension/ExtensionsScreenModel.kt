@@ -12,6 +12,7 @@ import eu.kanade.presentation.components.SEARCH_DEBOUNCE_MILLIS
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.extension.model.Extension
 import eu.kanade.tachiyomi.extension.model.InstallStep
+import eu.kanade.tachiyomi.extension.util.ExtensionInstaller.Companion.installKey
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import kotlinx.coroutines.delay
@@ -50,12 +51,7 @@ class ExtensionsScreenModel(
             {
                 ExtensionUiModel.Item(
                     it,
-                    map[
-                        it.pkgName +
-                            // KMK -->
-                            ":${it.signatureHash}",
-                        // KMK <--
-                    ] ?: InstallStep.Idle,
+                    map[it.installKey()] ?: InstallStep.Idle,
                 )
             }
         }
@@ -205,10 +201,7 @@ class ExtensionsScreenModel(
     private fun addDownloadState(extension: Extension, installStep: InstallStep) {
         currentDownloads.update {
             it + Pair(
-                extension.pkgName +
-                    // KMK -->
-                    ":${extension.signatureHash}",
-                // KMK <--
+                extension.installKey(),
                 installStep,
             )
         }
@@ -216,12 +209,7 @@ class ExtensionsScreenModel(
 
     private fun removeDownloadState(extension: Extension) {
         currentDownloads.update {
-            it - (
-                extension.pkgName +
-                    // KMK -->
-                    ":${extension.signatureHash}"
-                // KMK <--
-                )
+            it - extension.installKey()
         }
     }
 

@@ -13,6 +13,7 @@ import eu.kanade.tachiyomi.extension.model.InstallStep
 import eu.kanade.tachiyomi.extension.model.LoadResult
 import eu.kanade.tachiyomi.extension.util.ExtensionInstallReceiver
 import eu.kanade.tachiyomi.extension.util.ExtensionInstaller
+import eu.kanade.tachiyomi.extension.util.ExtensionInstaller.Companion.installKey
 import eu.kanade.tachiyomi.extension.util.ExtensionLoader
 import eu.kanade.tachiyomi.util.system.toast
 import exh.log.xLogD
@@ -197,12 +198,7 @@ class ExtensionManager(
 
         enableAdditionalSubLanguages(extensions)
 
-        availableExtensionMapFlow.value = extensions.associateBy {
-            it.pkgName +
-                // KMK -->
-                ":${it.signatureHash}"
-            // KMK <--
-        }
+        availableExtensionMapFlow.value = extensions.associateBy { it.installKey() }
         updatedInstalledExtensionsStatuses(extensions)
         setupAvailableExtensionsSourcesDataMap(extensions)
     }
@@ -309,22 +305,12 @@ class ExtensionManager(
      * @param extension The extension to be updated.
      */
     fun updateExtension(extension: Extension.Installed): Flow<InstallStep> {
-        val availableExt = availableExtensionMapFlow.value[
-            extension.pkgName +
-                // KMK -->
-                ":${extension.signatureHash}",
-            // KMK <--
-        ] ?: return emptyFlow()
+        val availableExt = availableExtensionMapFlow.value[extension.installKey()] ?: return emptyFlow()
         return installExtension(availableExt)
     }
 
     fun cancelInstallUpdateExtension(extension: Extension) {
-        installer.cancelInstall(
-            extension.pkgName +
-                // KMK -->
-                ":${extension.signatureHash}",
-            // KMK <--
-        )
+        installer.cancelInstall(extension.installKey())
     }
 
     /**
@@ -452,7 +438,7 @@ class ExtensionManager(
 
     private fun Extension.Installed.updateExists(availableExtension: Extension.Available? = null): Boolean {
         val availableExt = availableExtension
-            ?: availableExtensionMapFlow.value[pkgName]
+            ?: availableExtensionMapFlow.value[installKey()]
             ?: return false
 
         return (availableExt.versionCode > versionCode || availableExt.libVersion > libVersion)

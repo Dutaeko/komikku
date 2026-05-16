@@ -123,9 +123,11 @@ class ShizukuInstaller(private val service: Service) : Installer(service) {
         try {
             service.contentResolver.openAssetFileDescriptor(entry.uri, "r")?.use {
                 installer.install(it)
-            }
+            } ?: throw IllegalStateException("Failed to open asset file descriptor")
+            service.contentResolver.delete(entry.uri, null, null)
             // KMK <--
         } catch (e: Exception) {
+            service.contentResolver.delete(entry.uri, null, null)
             logcat(LogPriority.ERROR, e) { "Failed to install extension ${entry.downloadId} ${entry.uri}" }
             continueQueue(InstallStep.Error)
         }
