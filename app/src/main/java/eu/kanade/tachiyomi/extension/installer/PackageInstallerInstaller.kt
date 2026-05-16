@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.extension.installer
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
@@ -66,13 +67,13 @@ class PackageInstallerInstaller(private val service: Service) : Installer(servic
         super.processEntry(entry)
         activeSession = null
         try {
+            val fileSize = service.getUriSize(entry.uri) ?: throw IllegalStateException()
             val installParams = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+            installParams.setSize(fileSize)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 installParams.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
             }
             activeSession = entry to packageInstaller.createSession(installParams)
-            val fileSize = service.getUriSize(entry.uri) ?: throw IllegalStateException()
-            installParams.setSize(fileSize)
 
             val inputStream = service.contentResolver.openInputStream(entry.uri) ?: throw IllegalStateException()
             val session = packageInstaller.openSession(activeSession!!.second)
@@ -82,6 +83,7 @@ class PackageInstallerInstaller(private val service: Service) : Installer(servic
                     inputStream.copyTo(outputStream)
                     session.fsync(outputStream)
                 }
+                service.contentResolver.delete(entry.uri, null, null)
 
                 val intentSender = PendingIntent.getBroadcast(
                     service,
@@ -89,9 +91,11 @@ class PackageInstallerInstaller(private val service: Service) : Installer(servic
                     Intent(INSTALL_ACTION).setPackage(service.packageName),
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0,
                 ).intentSender
+                @SuppressLint("RequestInstallPackagesPolicy")
                 session.commit(intentSender)
             }
         } catch (e: Exception) {
+            service.contentResolver.delete(entry.uri, null, null)
             logcat(LogPriority.ERROR, e) { "Failed to install extension ${entry.downloadId} ${entry.uri}" }
             activeSession?.let { (_, sessionId) ->
                 packageInstaller.abandonSession(sessionId)
@@ -104,14 +108,19 @@ class PackageInstallerInstaller(private val service: Service) : Installer(servic
         activeSession?.let { (activeEntry, sessionId) ->
             if (activeEntry == entry) {
                 packageInstaller.abandonSession(sessionId)
-                return false
+                service.contentResolver.delete(entry.uri, null, null)
+                return true
             }
         }
         return true
     }
 
     override fun onDestroy() {
-        service.unregisterReceiver(packageActionReceiver)
+        try {
+            service.unregisterReceiver(packageActionReceiver)
+        } catch (e: IllegalArgumentException) {
+            logcat(LogPriority.WARN, e) { "Receiver was not registered when attempting to unregister" }
+        }
         super.onDestroy()
     }
 
