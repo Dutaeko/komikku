@@ -39,9 +39,10 @@ class ExtensionInstallActivity : Activity() {
         try {
             startActivityForResult(installIntent, INSTALL_REQUEST_CODE)
         } catch (error: Exception) {
-            // Either install package can't be found (probably bots) or there's a security exception
-            // with the download manager. Nothing we can workaround.
             toast(error.message)
+            checkInstallationResult(RESULT_FIRST_USER)
+            deleteApk()
+            finish()
         }
     }
 
@@ -52,6 +53,7 @@ class ExtensionInstallActivity : Activity() {
         }
         if (requestCode == INSTALL_REQUEST_CODE) {
             checkInstallationResult(resultCode)
+            deleteApk()
         }
         finish()
     }
@@ -60,6 +62,7 @@ class ExtensionInstallActivity : Activity() {
         super.onStart()
         if (hasIgnoredResult) {
             checkInstallationResult(RESULT_CANCELED)
+            deleteApk()
             finish()
         }
     }
@@ -73,6 +76,10 @@ class ExtensionInstallActivity : Activity() {
             else -> InstallStep.Error
         }
         extensionManager.updateInstallStep(downloadId, newStep)
+    }
+
+    private fun deleteApk() {
+        intent.data?.let { contentResolver.delete(it, null, null) }
     }
 }
 

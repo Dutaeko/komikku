@@ -115,9 +115,15 @@ abstract class Installer(private val service: Service) {
     @CallSuper
     open fun onDestroy() {
         LocalBroadcastManager.getInstance(service).unregisterReceiver(cancelReceiver)
-        queue.forEach { extensionManager.updateInstallStep(it.downloadId, InstallStep.Error) }
+        queue.forEach {
+            service.contentResolver.delete(it.uri, null, null)
+            extensionManager.updateInstallStep(it.downloadId, InstallStep.Error)
+        }
         queue.clear()
-        waitingInstall.store(null)
+        waitingInstall.exchange(null)?.let {
+            service.contentResolver.delete(it.uri, null, null)
+            extensionManager.updateInstallStep(it.downloadId, InstallStep.Error)
+        }
     }
 
     protected fun getActiveEntry(): Entry? = waitingInstall.load()
@@ -132,6 +138,7 @@ abstract class Installer(private val service: Service) {
         val toCancel = queue.find { it.downloadId == downloadId } ?: waitingInstall ?: return
         if (cancelEntry(toCancel)) {
             queue.remove(toCancel)
+            service.contentResolver.delete(toCancel.uri, null, null)
             if (waitingInstall == toCancel) {
                 // Currently processing removed entry, continue queue
                 this.waitingInstall.store(null)
