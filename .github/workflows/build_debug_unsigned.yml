@@ -1,0 +1,50 @@
+name: Build Debug Unsigned
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-debug:
+    name: Build Debug APK
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@f29f5a9d7b09a7c6b29859002d29d24e1674c884 # v5.0.1
+
+      - name: Set up JDK
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          java-version: 17
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@f29f5a9d7b09a7c6b29859002d29d24e1674c884 # v5
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: komikku-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
